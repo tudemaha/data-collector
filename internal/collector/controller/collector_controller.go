@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -80,6 +81,25 @@ func HandleCollectData() http.HandlerFunc {
 			return
 		}
 
+		data.Image, _, err = r.FormFile("image")
+		if err != nil {
+			response.BadRequest()
+			response.Message = err.Error()
+			w.WriteHeader(response.Status)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+		defer data.Image.Close()
+
+		buf := bytes.NewBuffer(nil)
+		if _, err := io.Copy(buf, data.Image); err != nil {
+			response.InternalServerError()
+			response.Message = err.Error()
+			w.WriteHeader(response.Status)
+			json.NewEncoder(w).Encode(response)
+			return
+		}
+
 		db := pkg.DBConnection
 
 		stmt, err := db.Prepare("INSERT INTO sensors" +
@@ -102,7 +122,7 @@ func HandleCollectData() http.HandlerFunc {
 			data.SoilPH,
 			data.Gas,
 			data.Coordinate,
-			data.Image)
+			buf.Bytes())
 		if err != nil {
 			response.InternalServerError()
 			response.Message = err.Error()
@@ -113,5 +133,18 @@ func HandleCollectData() http.HandlerFunc {
 
 		response.OK()
 		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func HandleRetrieveImage() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		db := pkg.DBConnection
+
+		var imgByte []byte
+		_ = db.QueryRow("SELECT image FROM sensors WHERE id = ?", id).Scan(&imgByte)
+
+		w.Header().Set("Content-Type", "image/jpeg")
+		w.Write(imgByte)
 	}
 }

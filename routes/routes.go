@@ -8,4 +8,5 @@ import (
 
 func Router() {
 	http.Handle("/upload", controller.HandleCollectData())
+	http.Handle("/image", controller.HandleRetrieveImage())
 }
