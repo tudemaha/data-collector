@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"strings"
@@ -34,16 +35,18 @@ func HandleCollectData() http.HandlerFunc {
 		}
 
 		var data collectorDto.Data
+		data.NodeID = r.FormValue("node_id")
+		data.GatewayID = r.FormValue("gateway_id")
 		data.Humidity = r.FormValue("humidity")
 		data.Temperature = r.FormValue("temperature")
 		data.SoilMoisture = r.FormValue("soil_moisture")
 		data.SoilPH = r.FormValue("soil_ph")
 		data.Gas = r.FormValue("gas")
-		data.Langitude = r.FormValue("langitude")
-		data.Latitude = r.FormValue("latitude")
-		data.Image = uuid.New().String()
+		data.Coordinate = r.FormValue("coordinate")
 
-		file, header, err := r.FormFile("image")
+		var header *multipart.FileHeader
+		var err error
+		data.Image, header, err = r.FormFile("image")
 		if err != nil {
 			response.BadRequest()
 			response.Message = err.Error()
@@ -51,12 +54,14 @@ func HandleCollectData() http.HandlerFunc {
 			json.NewEncoder(w).Encode(response)
 			return
 		}
-		defer file.Close()
+		defer data.Image.Close()
+
+		id, _ := uuid.NewV7()
 
 		filenameSplit := strings.Split(header.Filename, ".")
-		data.Image += "." + filenameSplit[len(filenameSplit)-1]
+		filename := id.String() + "." + filenameSplit[len(filenameSplit)-1]
 
-		dst, err := os.Create("images/" + data.Image)
+		dst, err := os.Create("images/" + filename)
 		if err != nil {
 			response.InternalServerError()
 			response.Message = err.Error()
@@ -66,7 +71,7 @@ func HandleCollectData() http.HandlerFunc {
 		}
 		defer dst.Close()
 
-		_, err = io.Copy(dst, file)
+		_, err = io.Copy(dst, data.Image)
 		if err != nil {
 			response.InternalServerError()
 			response.Message = err.Error()
@@ -78,8 +83,8 @@ func HandleCollectData() http.HandlerFunc {
 		db := pkg.DBConnection
 
 		stmt, err := db.Prepare("INSERT INTO sensors" +
-			"(humidity, temp, soil_moisture, soil_ph, gas, latitude, langitude, image)" +
-			"VALUE (?, ?, ?, ?, ?, ?, ?, ?)")
+			"(id, gateway_id, node_id, temp, humidity, soil_moisture, soil_ph, gas, coordinate, image)" +
+			"VALUE (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 		if err != nil {
 			response.InternalServerError()
 			response.Message = err.Error()
@@ -88,7 +93,16 @@ func HandleCollectData() http.HandlerFunc {
 			return
 		}
 
-		_, err = stmt.Exec(data.Humidity, data.Temperature, data.SoilMoisture, data.SoilPH, data.Gas, data.Langitude, data.Langitude, data.Image)
+		_, err = stmt.Exec(id,
+			data.GatewayID,
+			data.NodeID,
+			data.Temperature,
+			data.Humidity,
+			data.SoilMoisture,
+			data.SoilPH,
+			data.Gas,
+			data.Coordinate,
+			data.Image)
 		if err != nil {
 			response.InternalServerError()
 			response.Message = err.Error()
