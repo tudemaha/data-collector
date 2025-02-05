@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -32,6 +33,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 
@@ -53,6 +55,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 		defer data.Image.Close()
@@ -68,6 +71,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 		defer dst.Close()
@@ -78,6 +82,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 
@@ -87,6 +92,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 		defer data.Image.Close()
@@ -97,6 +103,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 
@@ -110,6 +117,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 
@@ -128,6 +136,7 @@ func HandleCollectData() http.HandlerFunc {
 			response.Message = err.Error()
 			w.WriteHeader(response.Status)
 			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleCollectData: %v\n", err)
 			return
 		}
 
@@ -138,11 +147,21 @@ func HandleCollectData() http.HandlerFunc {
 
 func HandleRetrieveImage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var response globalDto.Response
+
 		id := r.URL.Query().Get("id")
 		db := pkg.DBConnection
 
 		var imgByte []byte
-		_ = db.QueryRow("SELECT image FROM sensors WHERE id = ?", id).Scan(&imgByte)
+		err := db.QueryRow("SELECT image FROM sensors WHERE id = ?", id).Scan(&imgByte)
+		if err != nil {
+			response.InternalServerError()
+			response.Message = err.Error()
+			w.WriteHeader(response.Status)
+			json.NewEncoder(w).Encode(response)
+			log.Printf("ERROR HandleRetrieveImage: %v\n", err)
+			return
+		}
 
 		w.Header().Set("Content-Type", "image/jpeg")
 		w.Write(imgByte)
